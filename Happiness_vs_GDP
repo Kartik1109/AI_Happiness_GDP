@@ -1,0 +1,162 @@
+# Created: 14/09/2024
+# Author: Kartik Chaudhari
+# Implementation: For Assignment 1 Part 1, I have built a Linear Regression Model using the Happiness - GDP Dataset, applying the Gradient Descent Method to find the best Beta value. I also generated visualizations to highlight the relationships between the features and the target variable.
+# Sources: Class Notes + Textbook, kaggle.com, stackoverflow.com, medium.com, machinelearningmastery.com
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# import data
+data = pd.read_csv("gdp-vs-happiness.csv")
+
+#drop columns that will not be used
+by_year = (data[data['Year']==2018]).drop(columns=["Continent","Population (historical estimates)","Code"])
+# remove missing values from columns 
+df = by_year[(by_year['Cantril ladder score'].notna()) & (by_year['GDP per capita, PPP (constant 2017 international $)']).notna()]
+
+#create np.array for gdp and happiness where happiness score is above 4.5
+happiness=[]
+gdp=[]
+for row in df.iterrows():
+    if row[1]['Cantril ladder score']>4.5:
+        happiness.append(row[1]['Cantril ladder score'])
+        gdp.append(row[1]['GDP per capita, PPP (constant 2017 international $)'])
+
+class linear_regression():
+ 
+    def __init__(self,x_:list,y_:list) -> None:
+
+        self.input = np.array(x_)
+        self.target = np.array(y_)
+
+    def preprocess(self,):
+
+        #normalize the values
+        hmean = np.mean(self.input)
+        hstd = np.std(self.input)
+        x_train = (self.input - hmean)/hstd
+
+        #arrange in matrix format
+        X = np.column_stack((np.ones(len(x_train)),x_train))
+
+        #normalize the target
+        gmean = np.mean(self.target)
+        gstd = np.std(self.target)
+        y_train = (self.target - gmean)/gstd
+
+        #arrange in matrix format
+        Y = (np.column_stack(y_train)).T
+
+        return X, Y
+
+    def train(self, X, Y):
+        #compute and return beta
+        return np.linalg.inv(X.T.dot(X)).dot(X.T).dot(Y)
+    
+    def gradient_fit(self, X, Y, alpha, epochs):
+        """
+        Perform gradient descent to fit a linear regression model.
+        X: The input data with bias term
+        Y: The target variable
+        epochs: Number of iterations to run gradient descent
+        alpha: Learning rate for gradient descent
+        
+        Returns: The optimal beta values (coefficients) after training.
+        """
+        beta = np.random.rand(2,1)  # Initialize random weights (2 parameters: intercept and slope)
+        for i in range(epochs):
+            gradients = 2 / X.shape[0] * (X.T).dot(X.dot(beta) - Y)
+            beta = beta - alpha*gradients
+            
+        return beta
+    
+    def predict(self, X_test,beta):
+        #predict using beta
+        Y_hat = X_test*beta.T
+        return np.sum(Y_hat,axis=1)
+
+#instantiate the linear_regression class  
+lr_ols = linear_regression(gdp,happiness)
+
+# preprocess the inputs
+X,Y = lr_ols.preprocess()
+
+# Gradient Descent beta values for different learning rates and epochs
+Gradient_Beta_1 = lr_ols.gradient_fit(X, Y, 0.85, 50) 
+Gradient_Beta_2 = lr_ols.gradient_fit(X, Y, 0.25, 5)
+Gradient_Beta_3 = lr_ols.gradient_fit(X, Y, 0.1, 30)
+Gradient_Beta_4 = lr_ols.gradient_fit(X, Y, 0.01, 2000) 
+Gradient_Beta_5 = lr_ols.gradient_fit(X, Y, 0.03, 100)
+ 
+# Predictions using the different GD beta values
+Gradient_Predict_Y1 = lr_ols.predict(X, Gradient_Beta_1)
+Gradient_Predict_Y2 = lr_ols.predict(X, Gradient_Beta_2)
+Gradient_Predict_Y3 = lr_ols.predict(X, Gradient_Beta_3)
+Gradient_Predict_Y4 = lr_ols.predict(X, Gradient_Beta_4)
+Gradient_Predict_Y5 = lr_ols.predict(X, Gradient_Beta_5)
+
+# access the 1st column (the 0th column is all 1's)
+X_ = X[...,1].ravel()
+
+#set the plot and plot size
+fig, ax = plt.subplots()
+fig.set_size_inches((12,7))
+
+# display the X and Y points
+ax.scatter(X_, Y, color='darkviolet', label='Data Points')
+
+# Set regression lines for different gradient descent configurations with unique colors
+ax.plot(X_, Gradient_Predict_Y1, color='mediumslateblue', linestyle='--', label="GD: 50 epoch, alpha 0.85")
+ax.plot(X_, Gradient_Predict_Y2, color='goldenrod', linestyle='-.', label="GD: 5 epoch, alpha 0.25")
+ax.plot(X_, Gradient_Predict_Y3, color='seagreen', linestyle=':', label="GD: 30 epoch, alpha 0.1")
+ax.plot(X_, Gradient_Predict_Y4, color='firebrick', linestyle='-', label="GD: 2000 epoch, alpha 0.01")
+ax.plot(X_, Gradient_Predict_Y5, color='deeppink', linestyle='dashdot', label="GD: 100 epoch, alpha 0.03")
+
+# Set the x and y labels
+ax.set_xlabel("GDP per capita", fontsize=12, color='navy')
+ax.set_ylabel("Happiness", fontsize=12, color='navy')
+
+#set the title
+ax.set_title("Cantril Ladder Score vs GDP per capita of countries (2018)", fontsize=16, fontweight='bold', color='darkred')
+
+ax.legend()
+plt.show()
+
+# Print all the beta values, learning rates, and epochs for each gradient descent result
+print("")
+print(f"1st Beta Value using Gradient Descent: {Gradient_Beta_1.flatten()}, Epochs: 50, Alpha: 0.85")
+print(f"2nd Beta Value using Gradient Descent: {Gradient_Beta_2.flatten()}, Epochs: 5, Alpha: 0.25")
+print(f"3rd Beta Value using Gradient Descent: {Gradient_Beta_3.flatten()}, Epochs: 30, Alpha: 0.1")
+print(f"4th Beta Value using Gradient Descent: {Gradient_Beta_4.flatten()}, Epochs: 2000, Alpha: 0.01")
+print(f"5th Beta Value using Gradient Descent: {Gradient_Beta_5.flatten()}, Epochs: 100, Alpha: 0.03")
+print("")
+
+# OLS beta values
+beta_ols = lr_ols.train(X, Y)
+Y_predict_ols = lr_ols.predict(X, beta_ols)
+
+# Comparison between OLS and best gradient descent result
+fig, ax = plt.subplots()
+fig.set_size_inches((15, 8))
+ax.scatter(X_, Y, color='darkviolet', label='Data Points')
+# Plot the OLS regression line
+ax.plot(X_, Y_predict_ols, color='indigo', linestyle='-', label="OLS Fit")
+# Plot the best-fit line from gradient descent
+ax.plot(X_, Gradient_Predict_Y4, color='darkcyan', linestyle='--', label="GD Best Fit: 2000 epoch, alpha 0.01")
+ax.set_xlabel("GDP per capita", fontsize=12, color='navy')
+ax.set_ylabel("Happiness", fontsize=12, color='navy')
+# Set the title
+ax.set_title("Cantril Ladder Score vs GDP per capita of countries (2018)", fontsize=16, fontweight='bold', color='darkred')
+
+ax.legend()
+
+# Print beta values and parameters for OLS and the best GD result
+print("OLS Beta Value:", beta_ols)
+print("")
+print("Best Gradient Descent Beta Value:", Gradient_Beta_4)
+print("")
+print("Learning Rate (Alpha): 0.01")
+print("Epoch: 2000")
+
+plt.show()
